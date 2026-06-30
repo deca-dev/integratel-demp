@@ -146,7 +146,7 @@ app.get('/api/photo/:photoId', async (req, res) => {
   try {
     const token = await getAccessToken();
     const base = CREATIO_URL.replace(/\/$/, '');
-    const url = `${base}/0/odata/SysImage(${photoId})/Data/$value`;
+    const url = `${base}/0/img/entity/hash/SysImage/Data/${photoId}`;
 
     console.log(`→ GET photo ${url}`);
 
