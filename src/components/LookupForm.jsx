@@ -131,7 +131,7 @@ export default function LookupForm() {
       <p className="text-xs text-neutral-400 mt-5 text-center">
         {CONFIG.mode === 'mock'
           ? 'Modo demostración · datos locales para evaluación de la interfaz.'
-          : 'Datos obtenidos en tiempo real desde Creatio CRM vía OData REST API.'}
+          : ''}
       </p>
 
       {CONFIG.mode === 'proxy' && (
