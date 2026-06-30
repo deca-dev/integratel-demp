@@ -131,6 +131,40 @@ export default function LookupForm() {
           ? 'Modo demostración · datos locales para evaluación de la interfaz.'
           : 'Datos obtenidos en tiempo real desde Creatio CRM vía OData REST API.'}
       </p>
+
+      {CONFIG.mode === 'proxy' && (
+        <div className="mt-6 max-w-md mx-auto text-center">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-neutral-400 mb-2">
+            RUCs de prueba
+          </div>
+          <div className="flex flex-wrap justify-center gap-1.5">
+            <button
+              onClick={() => setRuc('20100017491')}
+              className="font-mono text-[11px] border border-neutral-200 bg-white px-2.5 py-1 rounded text-neutral-600 hover:border-movistar-blue hover:text-movistar-blue transition"
+            >
+              20100017491
+            </button>
+            <button
+              onClick={() => setRuc('10408765432')}
+              className="font-mono text-[11px] border border-neutral-200 bg-white px-2.5 py-1 rounded text-neutral-600 hover:border-movistar-blue hover:text-movistar-blue transition"
+            >
+              10408765432
+            </button>
+            <button
+              onClick={() => setRuc('20512345678')}
+              className="font-mono text-[11px] border border-neutral-200 bg-white px-2.5 py-1 rounded text-neutral-600 hover:border-movistar-blue hover:text-movistar-blue transition"
+            >
+              20512345678
+            </button>
+            <button
+              onClick={() => setRuc('10456789012')}
+              className="font-mono text-[11px] border border-neutral-200 bg-white px-2.5 py-1 rounded text-neutral-600 hover:border-movistar-blue hover:text-movistar-blue transition"
+            >
+              10456789012
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
