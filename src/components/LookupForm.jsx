@@ -101,15 +101,17 @@ export default function LookupForm() {
             <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-6">
               Información del cliente
             </h2>
-            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-6">
-              <ResultField label="Nombre" value={result?.Name} loading={loading} />
-              <ResultField label="Correo electrónico" value={result?.Email} loading={loading} />
-              <ResultField label="Sexo / Tipo" value={result?.UsrGender} loading={loading} />
-              <ResultField
-                label="Edad / Antigüedad"
-                value={result?.UsrAge != null ? `${result.UsrAge} años` : null}
-                loading={loading}
-              />
+            <div className="grid sm:grid-cols-[auto_1fr] gap-x-8 gap-y-6 items-start">
+              <ContactPhoto photoId={result?.PhotoId} loading={loading} />
+              <div className="grid gap-y-5">
+                <ResultField label="Nombre" value={result?.Name} loading={loading} />
+                <ResultField label="Correo electrónico" value={result?.Email} loading={loading} />
+                <ResultField
+                  label="Edad"
+                  value={result?.UsrAge != null ? `${result.UsrAge} años` : null}
+                  loading={loading}
+                />
+              </div>
             </div>
           </div>
         )}
@@ -180,6 +182,40 @@ function ResultField({ label, value, loading }) {
           value || '—'
         )}
       </div>
+    </div>
+  );
+}
+
+function ContactPhoto({ photoId, loading }) {
+  if (loading) {
+    return <div className="w-28 h-28 rounded-full bg-neutral-200 animate-pulse" />;
+  }
+
+  if (photoId) {
+    const photoUrl = `${CONFIG.proxyUrl.replace(/\/$/, '')}/api/photo/${photoId}`;
+    return (
+      <img
+        src={photoUrl}
+        alt="Foto del cliente"
+        className="w-28 h-28 rounded-full object-cover border border-neutral-200"
+        onError={(e) => {
+          // Si falla la carga, muestra el placeholder
+          e.currentTarget.outerHTML = `
+            <div class="w-28 h-28 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-400">
+              <svg class="w-12 h-12" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+            </div>`;
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="w-28 h-28 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-400">
+      <svg className="w-12 h-12" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+      </svg>
     </div>
   );
 }

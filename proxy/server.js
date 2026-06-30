@@ -1,25 +1,7 @@
 /**
  * Proxy de integración Creatio para Integratel.
- *
- * Por qué existe:
- *  - El front no puede llamar directo a Creatio: requiere autenticación (OAuth)
- *    y los secretos no pueden ir en el browser.
- *  - Este proxy guarda las credenciales de servicio y expone un único endpoint
- *    limpio para el portal: GET /api/cliente/:ruc
- *
- * Flujo:
- *  1. Recibe RUC del front.
- *  2. Obtiene/refresca access_token desde el Identity Service de Creatio
- *     (cache en memoria, refresco a los expires_in - 60s).
- *  3. Consulta OData de Creatio con el token.
- *  4. Devuelve el cliente normalizado, o 404 si no existe.
- *
- * Para correr local:
- *   cp .env.example .env  # llena las credenciales
- *   npm install
- *   npm run dev
- *
- * Para producción: deploy a Render, Railway, Fly.io o cualquier host con Node 18+.
+ * - Endpoint /api/cliente/:ruc → datos del contacto normalizados
+ * - Endpoint /api/photo/:photoId → bypass autenticado para servir la foto
  */
 
 import express from 'express';
@@ -33,7 +15,7 @@ const {
   CREATIO_CLIENT_SECRET,
   CREATIO_ENTITY = 'Contact',
   CREATIO_RUC_FIELD = 'UsrRUC',
-  CREATIO_SELECT = 'Name,Email,UsrGender,UsrAge',
+  CREATIO_SELECT = 'Name,Email,UsrRUC,Age,PhotoId',
   ALLOWED_ORIGINS = '*',
   PORT = 3000
 } = process.env;
@@ -49,13 +31,12 @@ app.use(cors({
 }));
 
 // ──────────────────────────────────────────────────────────────
-// Token cache (en memoria; OK para 1 instancia)
+// Token cache
 // ──────────────────────────────────────────────────────────────
 let tokenCache = { token: null, expiresAt: 0 };
 
 async function getAccessToken() {
   const now = Date.now();
-  // refresca 60s antes para evitar usar token a punto de expirar
   if (tokenCache.token && now < tokenCache.expiresAt - 60_000) {
     return tokenCache.token;
   }
@@ -118,8 +99,20 @@ async function queryCreatio(ruc) {
   return data.value?.[0] || null;
 }
 
+function normalize(raw) {
+  const EMPTY = '00000000-0000-0000-0000-000000000000';
+  const validPhoto = raw.PhotoId && raw.PhotoId !== EMPTY;
+
+  return {
+    Name: raw.Name ?? null,
+    Email: raw.Email ?? null,
+    UsrAge: raw.UsrAge ?? raw.Age ?? null,
+    PhotoId: validPhoto ? raw.PhotoId : null
+  };
+}
+
 // ──────────────────────────────────────────────────────────────
-// Endpoints
+// Endpoint principal
 // ──────────────────────────────────────────────────────────────
 app.get('/api/cliente/:ruc', async (req, res) => {
   const ruc = String(req.params.ruc).replace(/\D/g, '');
@@ -133,19 +126,51 @@ app.get('/api/cliente/:ruc', async (req, res) => {
     if (!raw) {
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
-
-    res.json({
-      ruc,
-      client: {
-        Name: raw.Name ?? null,
-        Email: raw.Email ?? null,
-        UsrGender: raw.UsrGender ?? raw.Gender ?? null,
-        UsrAge: raw.UsrAge ?? raw.Age ?? null
-      }
-    });
+    res.json({ ruc, client: normalize(raw) });
   } catch (err) {
     console.error('[query error]', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
+// Proxy de foto: descarga desde Creatio con token y la sirve
+// (porque el browser no puede pasarle el Bearer al <img>)
+// ──────────────────────────────────────────────────────────────
+app.get('/api/photo/:photoId', async (req, res) => {
+  const photoId = req.params.photoId;
+  if (!/^[0-9a-f-]{36}$/i.test(photoId)) {
+    return res.status(400).end();
+  }
+
+  try {
+    const token = await getAccessToken();
+    const base = CREATIO_URL.replace(/\/$/, '');
+    const url = `${base}/0/odata/SysImage(${photoId})/Data/$value`;
+
+    console.log(`→ GET photo ${url}`);
+
+    const r = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/octet-stream',
+        ForceUseSession: 'true'
+      }
+    });
+
+    if (!r.ok) {
+      console.error(`[photo] Creatio devolvió ${r.status}`);
+      return res.status(r.status).end();
+    }
+
+    const contentType = r.headers.get('content-type') || 'image/jpeg';
+    res.set('Content-Type', contentType);
+    res.set('Cache-Control', 'public, max-age=3600');
+    const buffer = Buffer.from(await r.arrayBuffer());
+    res.send(buffer);
+  } catch (err) {
+    console.error('[photo error]', err.message);
+    res.status(500).end();
   }
 });
 
@@ -155,14 +180,15 @@ app.get('/health', (_req, res) => {
     creatio: CREATIO_URL,
     entity: CREATIO_ENTITY,
     field: CREATIO_RUC_FIELD,
+    select: CREATIO_SELECT,
     tokenCached: !!tokenCache.token
   });
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀  Proxy Integratel × Creatio en http://localhost:${PORT}`);
-  console.log(`    Endpoint: GET /api/cliente/:ruc`);
-  console.log(`    Health:   GET /health`);
-  console.log(`    Creatio:  ${CREATIO_URL}`);
-  console.log(`    Entidad:  ${CREATIO_ENTITY} · campo RUC: ${CREATIO_RUC_FIELD}`);
+  console.log(`🚀  Proxy en http://localhost:${PORT}`);
+  console.log(`    Endpoint:  GET /api/cliente/:ruc`);
+  console.log(`    Foto:      GET /api/photo/:photoId`);
+  console.log(`    Health:    GET /health`);
+  console.log(`    Creatio:   ${CREATIO_URL}`);
 });
